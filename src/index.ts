@@ -55,10 +55,10 @@ export class Quarr<T extends Record<string, any>> {
     return this.sum(field) / this.data.length;
   }
 
-  join<U extends Record<string, any>, K extends keyof T & keyof U>(
+  join<U extends Record<string, any>, V>(
     other: U[],
-    key1: K,
-    key2: K,
+    key1: keyof T,
+    key2: keyof U,
     selectFields?: (item: T & U) => Partial<T & U>
   ): Quarr<T & U> {
     if (!Array.isArray(other) || !other.every((item) => typeof item === 'object')) {
@@ -69,7 +69,7 @@ export class Quarr<T extends Record<string, any>> {
   
     this.data.forEach((item1) => {
       other.forEach((item2) => {
-        if ((item1[key1] as unknown) === (item2[key2] as unknown)) {
+        if (item1[key1] === (item2[key2] as unknown)) {
           const combined = { ...item1, ...item2 } as T & U;
           joinedData.push(
             selectFields ? (selectFields(combined) as T & U) : combined
@@ -80,6 +80,7 @@ export class Quarr<T extends Record<string, any>> {
   
     return new Quarr<T & U>(joinedData);
   }
+  
 
   execute(): Partial<T>[] {
     let result: any[] = [...this.data];
