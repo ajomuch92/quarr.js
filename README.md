@@ -28,7 +28,7 @@ yarn add quarr
 ### Import the Library
 
 ```typescript
-import { Query } from "quarr";
+import { Quarr } from "quarr";
 ```
 
 ### Example: Basic Query
@@ -41,7 +41,7 @@ const data = [
 ];
 
 // Select specific fields, filter, and sort
-const result = Query.from(data)
+const result = Quarr.from(data)
   .select(["id", "name"])
   .where((item) => item.age > 25)
   .sort("name", "asc")
@@ -67,7 +67,7 @@ const otherData = [
 ];
 
 // Perform a join using 'id' and 'userId'
-const result = Query.from(data)
+const result = Quarr.from(data)
   .join(otherData, "id", "userId", (item) => ({
     id: item.id,
     name: item.name,
@@ -93,8 +93,8 @@ const data = [
 ];
 
 // Calculate sum and average
-const totalSalary = Query.from(data).sum("salary");
-const averageAge = Query.from(data).avg("age");
+const totalSalary = Quarr.from(data).sum("salary");
+const averageAge = Quarr.from(data).avg("age");
 
 console.log("Total Salary:", totalSalary); // 180000
 console.log("Average Age:", averageAge); // 30
@@ -102,7 +102,7 @@ console.log("Average Age:", averageAge); // 30
 
 ## API Reference
 
-### `Query.from(data: T[])`
+### `Quarr.from(data: T[])`
 
 Creates a new query instance from an array of objects.
 
