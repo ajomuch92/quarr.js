@@ -11,7 +11,8 @@
   "keywords": [
     "query",
     "array",
-    "manipulate"
+    "manipulate",
+    "SQL"
   ],
   "author": "Aarón Montes",
   "license": "MIT",
