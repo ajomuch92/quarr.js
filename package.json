@@ -1,7 +1,7 @@
 {
   "name": "quarr.js",
-  "version": "0.0.1",
-  "description": "Project to manipulate and filter arrays ",
+  "version": "0.0.2",
+  "description": "Project to manipulate and filter arrays as SQL does",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -12,9 +12,13 @@
     "query",
     "array",
     "manipulate",
-    "SQL"
+    "SQL",
+    "utils"
   ],
   "author": "Aarón Montes",
+  "repository": {
+    "url": "https://github.com/ajomuch92/quarr.js"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^29.5.14",
