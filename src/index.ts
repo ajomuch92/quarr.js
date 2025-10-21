@@ -53,6 +53,13 @@ export class Quarr<T extends Record<string, any>> {
     return this;
   }
 
+  count(predicate?: (item: T) => boolean): number {
+    return this.data.reduce(
+      (acc, item) => acc + (predicate ? (predicate(item) ? 1 : 0) : 1),
+      0
+    );
+  }
+
   sum(field: keyof T): number {
     if (typeof this.data[0]?.[field] !== 'number') {
       throw new Error(`Field "${String(field)}" must be numeric for sum operation.`);
