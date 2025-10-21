@@ -6,6 +6,8 @@ export class Quarr<T extends Record<string, any>> {
   private filters: ((item: T) => boolean)[] = [];
   private sortField?: keyof T;
   private sortOrder: SortOrder = 'asc';
+  private skipCount = 0;
+  private limitCount?: number;
 
   constructor(data: T[]) {
     if (!Array.isArray(data)) {
@@ -36,6 +38,18 @@ export class Quarr<T extends Record<string, any>> {
   sort(field: keyof T, order: SortOrder = 'asc'): this {
     this.sortField = field;
     this.sortOrder = order;
+    return this;
+  }
+
+  skip(count: number): this {
+    if (count < 0) throw new Error('Skip count must be non-negative.');
+    this.skipCount = count;
+    return this;
+  }
+
+  limit(count: number): this {
+    if (count <= 0) throw new Error('Limit count must be greater than 0.');
+    this.limitCount = count;
     return this;
   }
 
