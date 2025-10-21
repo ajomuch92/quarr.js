@@ -1,6 +1,6 @@
 {
   "name": "quarr.js",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "Project to manipulate and filter arrays as SQL does",
   "main": "build/index.js",
   "types": "build/index.d.ts",
