@@ -144,4 +144,174 @@ export class Quarr<T extends Record<string, any>> {
 
     return result;
   }
+
+  static query<U extends Record<string, any>>(data: U[], query: string): any {
+    if (!Array.isArray(data)) {
+      throw new Error('First argument must be an array of objects.');
+    }
+
+    if (!Quarr.isValidQuery(query)) {
+      throw new Error('Invalid or unsupported SQL query.');
+    }
+
+    // Normalize spaces
+    const normalized = query.trim().replace(/\s+/g, ' ');
+
+    // --- 1️⃣ Detect aggregate function (SUM, AVG, MAX, COUNT)
+    const aggMatch = normalized.match(/SELECT\s+(SUM|AVG|MAX|COUNT)\((\*|\w+)\)/i);
+    const aggregateFn = aggMatch ? aggMatch[1].toUpperCase() : null;
+    const aggregateField = aggMatch ? aggMatch[2] : null;
+
+    // --- 2️⃣ Detect selected fields
+    const fieldsMatch = normalized.match(/SELECT\s+(.+?)\s+FROM/i);
+    if (!fieldsMatch) throw new Error('Invalid query: missing SELECT or FROM.');
+    const fieldStr = fieldsMatch[1].trim();
+
+    const fields =
+      fieldStr === '*'
+        ? null
+        : fieldStr
+            .split(',')
+            .map((f) => f.trim())
+            .filter((f) => !/\(|\)/.test(f)); // exclude aggregate functions
+
+    // --- 3️⃣ Detect WHERE clause
+    const whereMatch = normalized.match(/WHERE\s+(.+?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+OFFSET|$)/i);
+    const whereClause = whereMatch ? whereMatch[1].trim() : null;
+
+    // --- 4️⃣ Detect ORDER BY
+    const orderMatch = normalized.match(/ORDER\s+BY\s+(\w+)(?:\s+(ASC|DESC))?/i);
+    const orderField = orderMatch ? orderMatch[1] : null;
+    const orderDirection = orderMatch
+      ? (orderMatch[2]?.toLowerCase() as 'asc' | 'desc') ?? 'asc'
+      : 'asc';
+
+    // --- 5️⃣ Detect LIMIT and OFFSET
+    const limitMatch = normalized.match(/LIMIT\s+(\d+)/i);
+    const offsetMatch = normalized.match(/OFFSET\s+(\d+)/i);
+    const limit = limitMatch ? parseInt(limitMatch[1]) : undefined;
+    const offset = offsetMatch ? parseInt(offsetMatch[1]) : 0;
+
+    // --- 6️⃣ Create base Quarr instance
+    let q = new Quarr<U>(data);
+
+    // Apply WHERE
+    if (whereClause) {
+      const predicates = Quarr.parseWhere(whereClause);
+      predicates.forEach((p) => (q = q.where(p)));
+    }
+
+    // Apply ORDER BY
+    if (orderField) {
+      q = q.sort(orderField as keyof U, orderDirection);
+    }
+
+    // Apply OFFSET / LIMIT
+    if (offset) q = q.skip(offset);
+    if (limit) q = q.limit(limit);
+
+    // Apply SELECT (only if not aggregate)
+    if (fields && !aggregateFn) q = q.select(fields as (keyof U)[]);
+
+    // --- 7️⃣ Execute aggregate function if applicable
+    if (aggregateFn) {
+      switch (aggregateFn) {
+        case 'SUM':
+          if (!aggregateField || aggregateField === '*') throw new Error('SUM requires a field name.');
+          return q.sum(aggregateField as keyof U);
+
+        case 'AVG':
+          if (!aggregateField || aggregateField === '*') throw new Error('AVG requires a field name.');
+          return q.avg(aggregateField as keyof U);
+
+        case 'MAX':
+          if (!aggregateField || aggregateField === '*') throw new Error('MAX requires a field name.');
+          return Math.max(...(q.execute().map((d) => d[aggregateField]) as number[]));
+
+        case 'COUNT':
+          // COUNT(*) or COUNT(field) -> same behavior (number of items)
+          const filteredData = q.execute();
+          return filteredData.reduce((acc) => acc + 1, 0);
+      }
+    }
+
+    // --- 8️⃣ If no aggregate function, execute normally
+    return q.execute();
+  }
+
+  /**
+   * Parses a simple WHERE clause and returns a list of predicates.
+   * Supports operators: =, !=, >, <, >=, <=
+   * Example: "age > 30 AND name != 'Ana'"
+   */
+  private static parseWhere<U extends Record<string, any>>(
+    clause: string
+  ): ((item: U) => boolean)[] {
+    // Split by AND (OR not supported to keep it simple)
+    const conditions = clause.split(/\s+AND\s+/i).map((c) => c.trim());
+
+    const predicates: ((item: U) => boolean)[] = [];
+
+    for (const cond of conditions) {
+      const match = cond.match(
+        /^(\w+)\s*(=|!=|>|<|>=|<=)\s*('?[\w.\s-]+'?|\d+(\.\d+)?)$/
+      );
+      if (!match) continue;
+
+      const [, field, operator, rawValue] = match;
+      let value: any = rawValue.replace(/^'|'$/g, ''); // remove quotes
+      if (!isNaN(Number(value))) value = Number(value); // convert numbers
+
+      predicates.push((item: U) => {
+        const fieldValue = item[field as keyof U];
+        switch (operator) {
+          case '=':
+            return fieldValue == value;
+          case '!=':
+            return fieldValue != value;
+          case '>':
+            return fieldValue > value;
+          case '<':
+            return fieldValue < value;
+          case '>=':
+            return fieldValue >= value;
+          case '<=':
+            return fieldValue <= value;
+          default:
+            return false;
+        }
+      });
+    }
+
+    return predicates;
+  }
+
+  static isValidQuery(query: string): boolean {
+    if (typeof query !== 'string') return false;
+    const normalized = query.trim().replace(/\s+/g, ' ').toUpperCase();
+
+    // 1️⃣ Must start with SELECT and contain FROM
+    if (!/^SELECT\s+.+\s+FROM\s+\w+/.test(normalized)) return false;
+
+    // 2️⃣ Must not contain unsupported keywords
+    const forbidden = [
+      'JOIN',
+      'GROUP BY',
+      'INSERT',
+      'UPDATE',
+      'DELETE',
+      'HAVING',
+      'UNION',
+      'INTO',
+      'VALUES',
+    ];
+
+    if (forbidden.some((kw) => normalized.includes(kw))) return false;
+
+    // 3️⃣ Must only match allowed patterns (simplified)
+    const validPattern =
+      /^SELECT\s+((\*|(\w+\s*(,\s*\w+)*))|(SUM|AVG|MAX|COUNT)\(\*|\w+\))\s+FROM\s+\w+(\s+WHERE\s+.+?)?(\s+ORDER\s+BY\s+\w+(\s+(ASC|DESC))?)?(\s+LIMIT\s+\d+)?(\s+OFFSET\s+\d+)?$/i;
+
+    return validPattern.test(query.trim());
+  }
 }
