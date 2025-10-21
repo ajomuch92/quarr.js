@@ -116,6 +116,15 @@ export class Quarr<T extends Record<string, any>> {
       });
     }
 
+    // Apply skip and limit (pagination)
+    if (this.skipCount) {
+      result = result.slice(this.skipCount);
+    }
+
+    if (this.limitCount) {
+      result = result.slice(0, this.limitCount);
+    }
+
     // Apply field selection
     if (this.selectedFields) {
       result = result.map((item) =>
