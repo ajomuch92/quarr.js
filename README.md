@@ -9,6 +9,8 @@
 - **Type-safe**: Ensures all operations are type-checked
 - **Lightweight**: Zero dependencies
 - **Simple API**: Familiar and expressive syntax
+- **Query validation and parsing**: Validate and parse SQL-like query strings
+- **Tested**: Comprehensive unit tests for reliability
 
 ## 📦 Installation
 
