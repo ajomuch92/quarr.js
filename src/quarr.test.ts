@@ -94,7 +94,7 @@ describe('Quarr', () => {
 
   it('should execute SQL-like query with select, where, and order', () => {
     const query = 'SELECT name, salary FROM data WHERE age > 25 ORDER BY salary DESC LIMIT 2 OFFSET 0';
-    const result = Quarr.query(data, query);
+    const result = Quarr.fromQuery(data, query);
 
     expect(result).toEqual([
       { name: 'David', salary: 80000 },
@@ -104,21 +104,21 @@ describe('Quarr', () => {
 
   it('should calculate count from SQL-like query', () => {
     const query = 'SELECT COUNT(*) FROM data WHERE salary >= 60000';
-    const result = Quarr.query(data, query);
+    const result = Quarr.fromQuery(data, query);
 
     expect(result).toBe(3);
   });
 
   it('should calculate avg from SQL-like query', () => {
     const query = 'SELECT AVG(age) FROM data WHERE salary >= 60000';
-    const result = Quarr.query(data, query);
+    const result = Quarr.fromQuery(data, query);
 
     expect(result).toBe(35);
   });
 
   it('should calculate sum from SQL-like query', () => {
     const query = 'SELECT SUM(salary) FROM data WHERE age > 25';
-    const result = Quarr.query(data, query);
+    const result = Quarr.fromQuery(data, query);
 
     expect(result).toBe(210000);
   });

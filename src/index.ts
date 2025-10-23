@@ -145,7 +145,7 @@ export class Quarr<T extends Record<string, any>> {
     return result;
   }
 
-  static query<U extends Record<string, any>>(data: U[], query: string): any {
+  static fromQuery<U extends Record<string, any>>(data: U[], query: string): any {
     if (!Array.isArray(data)) {
       throw new Error('First argument must be an array of objects.');
     }
