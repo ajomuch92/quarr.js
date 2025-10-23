@@ -180,7 +180,7 @@ export class Quarr<T extends Record<string, any>> {
     const whereClause = whereMatch ? whereMatch[1].trim() : null;
 
     // --- 4️⃣ Detect ORDER BY
-    const orderMatch = normalized.match(/ORDER\s+BY\s+(\w+)(?:\s+(ASC|DESC))?/i);
+    const orderMatch = normalized.match(/(?:ORDER|SORT)\s+BY\s+(\w+)(?:\s+(ASC|DESC))?/i);
     const orderField = orderMatch ? orderMatch[1] : null;
     const orderDirection = orderMatch
       ? (orderMatch[2]?.toLowerCase() as 'asc' | 'desc') ?? 'asc'
@@ -215,22 +215,35 @@ export class Quarr<T extends Record<string, any>> {
 
     // --- 7️⃣ Execute aggregate function if applicable
     if (aggregateFn) {
+      const filteredData = q.execute();
+
       switch (aggregateFn) {
         case 'SUM':
-          if (!aggregateField || aggregateField === '*') throw new Error('SUM requires a field name.');
-          return q.sum(aggregateField as keyof U);
+          if (!aggregateField || aggregateField === '*')
+            throw new Error('SUM requires a field name.');
+          return filteredData.reduce(
+            (acc, item) => acc + (Number(item[aggregateField]) || 0),
+            0
+          );
 
         case 'AVG':
-          if (!aggregateField || aggregateField === '*') throw new Error('AVG requires a field name.');
-          return q.avg(aggregateField as keyof U);
+          if (!aggregateField || aggregateField === '*')
+            throw new Error('AVG requires a field name.');
+          const numericValues = filteredData
+            .map((item) => Number(item[aggregateField]))
+            .filter((n) => !isNaN(n));
+          return numericValues.length
+            ? numericValues.reduce((a, b) => a + b, 0) / numericValues.length
+            : 0;
 
         case 'MAX':
-          if (!aggregateField || aggregateField === '*') throw new Error('MAX requires a field name.');
-          return Math.max(...(q.execute().map((d) => d[aggregateField]) as number[]));
+          if (!aggregateField || aggregateField === '*')
+            throw new Error('MAX requires a field name.');
+          return Math.max(
+            ...(filteredData.map((i) => Number(i[aggregateField])) as number[])
+          );
 
         case 'COUNT':
-          // COUNT(*) or COUNT(field) -> same behavior (number of items)
-          const filteredData = q.execute();
           return filteredData.reduce((acc) => acc + 1, 0);
       }
     }
@@ -266,9 +279,9 @@ export class Quarr<T extends Record<string, any>> {
         const fieldValue = item[field as keyof U];
         switch (operator) {
           case '=':
-            return fieldValue == value;
+            return fieldValue === value;
           case '!=':
-            return fieldValue != value;
+            return fieldValue !== value;
           case '>':
             return fieldValue > value;
           case '<':
@@ -290,10 +303,7 @@ export class Quarr<T extends Record<string, any>> {
     if (typeof query !== 'string') return false;
     const normalized = query.trim().replace(/\s+/g, ' ').toUpperCase();
 
-    // 1️⃣ Must start with SELECT and contain FROM
-    if (!/^SELECT\s+.+\s+FROM\s+\w+/.test(normalized)) return false;
-
-    // 2️⃣ Must not contain unsupported keywords
+    // Rechazar comandos no permitidos rápido
     const forbidden = [
       'JOIN',
       'GROUP BY',
@@ -305,13 +315,22 @@ export class Quarr<T extends Record<string, any>> {
       'INTO',
       'VALUES',
     ];
-
     if (forbidden.some((kw) => normalized.includes(kw))) return false;
 
-    // 3️⃣ Must only match allowed patterns (simplified)
-    const validPattern =
-      /^SELECT\s+((\*|(\w+\s*(,\s*\w+)*))|(SUM|AVG|MAX|COUNT)\(\*|\w+\))\s+FROM\s+\w+(\s+WHERE\s+.+?)?(\s+ORDER\s+BY\s+\w+(\s+(ASC|DESC))?)?(\s+LIMIT\s+\d+)?(\s+OFFSET\s+\d+)?$/i;
+    // Campos permitidos: '*' | list de campos | FUNC(field) donde FUNC = SUM|AVG|MAX|COUNT
+    // Estructura permitida:
+    // SELECT <fields> FROM <table> [WHERE ...] [ORDER|SORT BY <field> [ASC|DESC]] [LIMIT n] [OFFSET n]
+    const fieldPart = '(?:\\*|(?:\\w+\\s*(?:,\\s*\\w+)*))|(?:(SUM|AVG|MAX|COUNT)\\(\\s*(?:\\*|\\w+)\\s*\\))';
+    const pattern = new RegExp(
+      '^SELECT\\s+(' + fieldPart + ')\\s+FROM\\s+\\w+' +
+        '(?:\\s+WHERE\\s+.+?)?' +
+        '(?:\\s+(?:ORDER|SORT)\\s+BY\\s+\\w+(?:\\s+(?:ASC|DESC))?)?' +
+        '(?:\\s+LIMIT\\s+\\d+)?' +
+        '(?:\\s+OFFSET\\s+\\d+)?$',
+      'i'
+    );
 
-    return validPattern.test(query.trim());
+    return pattern.test(query.trim());
   }
+
 }
