@@ -29,6 +29,7 @@ export function parseSQL(query: string): SQLSelectAST {
 
   const selectMatch = clean.match(/^SELECT (.+?) FROM /i);
   if (!selectMatch) throw new Error("Invalid query: missing SELECT or FROM");
+  if (query.toLocaleLowerCase().includes('join')) throw new Error("Invalid query: JOIN not supported");
 
   const fieldsRaw = selectMatch[1].split(",").map((f) => f.trim());
   result.fields = fieldsRaw.map((f) => {
