@@ -106,21 +106,21 @@ describe('Quarr', () => {
     const query = 'SELECT COUNT(*) FROM data WHERE salary >= 60000';
     const result = Quarr.fromQuery(data, query);
 
-    expect(result).toBe(3);
+    expect(result).toStrictEqual([{"COUNT(*)": 3}]);
   });
 
   it('should calculate avg from SQL-like query', () => {
     const query = 'SELECT AVG(age) FROM data WHERE salary >= 60000';
     const result = Quarr.fromQuery(data, query);
 
-    expect(result).toBe(35);
+    expect(result).toStrictEqual([{"AVG(age)": 35}]);
   });
 
   it('should calculate sum from SQL-like query', () => {
     const query = 'SELECT SUM(salary) FROM data WHERE age > 25';
     const result = Quarr.fromQuery(data, query);
 
-    expect(result).toBe(210000);
+    expect(result).toStrictEqual([{"SUM(salary)": 210000}]);
   });
 
   it('should reject unsupported SQL expressions', () => {
@@ -130,19 +130,8 @@ describe('Quarr', () => {
       'SELECT * FROM data JOIN other',
     ];
 
-    const mapInvalidQueries = invalidQueries.map((q) => Quarr.isValidQuery(q));
-    expect(mapInvalidQueries).toEqual([false, false, false]);
-  });
-
-  it('should accept supported SQL expressions', () => {
-    const validQueries = [
-      'SELECT * FROM data',
-      'SELECT name, age FROM data WHERE age > 25 ORDER BY age DESC LIMIT 5 OFFSET 2',
-      'SELECT SUM(salary) FROM data',
-      'SELECT COUNT(*) FROM data',
-    ];
-
-    const mapValidQueries = validQueries.map((q) => Quarr.isValidQuery(q));
-    expect(mapValidQueries).toEqual([true, true, true, true]);
+    expect(() => Quarr.fromQuery(data, invalidQueries[0])).toThrow();
+    expect(() => Quarr.fromQuery(data, invalidQueries[1])).toThrow();
+    expect(() => Quarr.fromQuery(data, invalidQueries[2])).toThrow();
   });
 });

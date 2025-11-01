@@ -124,4 +124,8 @@ describe("SQL Parser (quarr)", () => {
     const res = executeAST(ast, sampleData);
     expect(res[0].total).toBe(sampleData.length);
   });
+
+  test('parseSQL debería lanzar error para query inválida', () => {
+    expect(() => parseSQL("DELETE FROM data")).toThrow("Invalid query: missing SELECT or FROM");
+  });
 });
