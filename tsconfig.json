@@ -12,7 +12,8 @@
       "forceConsistentCasingInFileNames": true,
       "strict": true,
       "noImplicitAny": true,
-      "skipLibCheck": true
+      "skipLibCheck": true,
+      "removeComments": true
     },
     "include": ["src/**/*"],
     "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"]
