@@ -1,16 +1,20 @@
 # Quarr: SQL-Like Query for Arrays
 
-`quarr` is a lightweight TypeScript library that brings SQL-like operations to arrays of objects. It allows you to perform operations such as `select`, `where`, `sort`, `join`, `sum`, `avg`, and `count`, all while maintaining TypeScript's type safety and performance.
+`quarr` is a lightweight TypeScript library that brings SQL-like operations to arrays of objects.  
+It now supports **aggregations**, **field aliases**, **advanced filtering**, and a built-in **SQL-like parser** — all with zero dependencies.
+
+---
 
 ## 🚀 Features
 
-- **SQL-like operations**: `select`, `where`, `sort`, `join`, `sum`, `avg`, `count`
-- **Smart indexing**: Joins and queries are optimized with internal indexing
-- **Type-safe**: Ensures all operations are type-checked
-- **Lightweight**: Zero dependencies
-- **Simple API**: Familiar and expressive syntax
-- **Query validation and parsing**: Validate and parse SQL-like query strings
-- **Tested**: Comprehensive unit tests for reliability
+- **SQL-like operations**: `SELECT`, `WHERE`, `ORDER BY`, `JOIN`, `SUM`, `AVG`, `COUNT`, `MIN`, `MAX`
+- **Advanced filtering**: Supports `AND`, `OR`, parentheses, comparison operators (`=`, `!=`, `>`, `<`, `>=`, `<=`, `LIKE`)
+- **Aliases (`AS`)** for field renaming
+- **Raw SQL-like parser** (`fromQuery`) for quick querying — *(no JOINs supported in raw mode)*
+- **Type-safe and dependency-free**
+- **Tested** with Jest
+
+---
 
 ## 📦 Installation
 
@@ -20,19 +24,21 @@ npm install quarr.js
 yarn add quarr.js
 ```
 
+---
+
 ## 💡 Usage
 
-### Import the Library
+### Import
 
-```typescript
+```ts
 import { Quarr } from "quarr.js";
 ```
 
 ---
 
-### 🧭 Example: Basic Query
+### 🧭 Example: Basic Query Builder
 
-```typescript
+```ts
 const data = [
   { id: 1, name: "Alice", age: 25, salary: 50000 },
   { id: 2, name: "Bob", age: 30, salary: 60000 },
@@ -46,14 +52,61 @@ const result = Quarr.from(data)
   .execute();
 
 console.log(result);
-// Output: [ { id: 2, name: 'Bob' }, { id: 3, name: 'Charlie' } ]
+// → [ { id: 2, name: 'Bob' }, { id: 3, name: 'Charlie' } ]
 ```
 
 ---
 
-### 🔗 Example: Join Operation
+### 🧮 Example: Aggregations (`SUM`, `AVG`, `MIN`, `MAX`, `COUNT`)
 
-```typescript
+```ts
+const employees = [
+  { id: 1, name: "Alice", age: 25, salary: 50000 },
+  { id: 2, name: "Bob", age: 30, salary: 60000 },
+  { id: 3, name: "Charlie", age: 35, salary: 70000 },
+];
+
+console.log("Total Salary:", Quarr.from(employees).sum("salary")); // 180000
+console.log("Average Age:", Quarr.from(employees).avg("age"));     // 30
+console.log("Max Salary:", Quarr.from(employees).max("salary"));   // 70000
+console.log("Min Salary:", Quarr.from(employees).min("salary"));   // 50000
+console.log("Employee Count:", Quarr.from(employees).count());     // 3
+```
+
+---
+
+### 🧩 Example: SQL-like Query (via Parser)
+
+```ts
+const employees = [
+  { id: 1, name: "Alice", age: 25, salary: 50000 },
+  { id: 2, name: "Bob", age: 30, salary: 60000 },
+  { id: 3, name: "Charlie", age: 35, salary: 70000 },
+];
+
+// Basic SELECT
+console.log(Quarr.fromQuery(employees, "SELECT id, name FROM employees WHERE age >= 30"));
+
+// Using aliases and LIKE
+console.log(Quarr.fromQuery(employees, "SELECT name AS employee, salary FROM employees WHERE name LIKE 'a'"));
+
+// Using aggregation directly in query
+console.log(Quarr.fromQuery(employees, "SELECT AVG(salary) AS average_salary FROM employees"));
+```
+
+**Output:**
+```json
+[ { "average_salary": 60000 } ]
+```
+
+🧠 *Note:* `fromQuery` (raw SQL-like parser) does **not** support `JOIN` statements.  
+Use the programmatic API (`.join()`) for join operations.
+
+---
+
+### 🔗 Example: Join Operation (Programmatic)
+
+```ts
 const users = [
   { id: 1, name: "Alice", age: 25 },
   { id: 2, name: "Bob", age: 30 },
@@ -75,8 +128,7 @@ const result = Quarr.from(users)
   .execute();
 
 console.log(result);
-// Output:
-// [
+// → [
 //   { id: 1, name: 'Alice', country: 'USA' },
 //   { id: 2, name: 'Bob', country: 'UK' },
 //   { id: 3, name: 'Charlie', country: 'Canada' }
@@ -85,99 +137,79 @@ console.log(result);
 
 ---
 
-### 🧮 Example: Aggregation (`sum`, `avg`, `count`)
+## 🧠 Supported Query Syntax
 
-```typescript
-const employees = [
-  { id: 1, name: "Alice", age: 25, salary: 50000 },
-  { id: 2, name: "Bob", age: 30, salary: 60000 },
-  { id: 3, name: "Charlie", age: 35, salary: 70000 },
-];
+Quarr’s parser supports a subset of SQL syntax:
 
-const totalSalary = Quarr.from(employees).sum("salary");
-const averageAge = Quarr.from(employees).avg("age");
-const count = Quarr.from(employees).count();
-
-console.log("Total Salary:", totalSalary); // 180000
-console.log("Average Age:", averageAge);   // 30
-console.log("Total Count:", count);        // 3
+```sql
+SELECT name AS employee, salary
+FROM employees
+WHERE age >= 30 AND salary > 50000
+ORDER BY name ASC
 ```
+
+### Supported Features
+- `SELECT` with optional aliases (`AS`)
+- `WHERE` with logical operators (`AND`, `OR`)
+- `LIKE`, comparisons (`=`, `!=`, `>`, `<`, `>=`, `<=`)
+- Parentheses for nested conditions
+- Aggregations (`SUM`, `AVG`, `MIN`, `MAX`, `COUNT`)
+- `ORDER BY`
+- **No JOINs in raw query mode**
 
 ---
 
-### 🧠 Example: Validate Query Expression
-
-```typescript
-import { Quarr } from "quarr";
-
-console.log(Quarr.isValidQuery("SELECT * FROM users WHERE age > 20")); // true
-console.log(Quarr.isValidQuery("DROP TABLE users")); // false
-```
-
----
-
-### 🧠 Example: Parsing Query Expression
-
-```typescript
-import { Quarr } from "quarr";
-
-const employees = [
-  { id: 1, name: "Alice", age: 25, salary: 50000 },
-  { id: 2, name: "Bob", age: 30, salary: 60000 },
-  { id: 3, name: "Charlie", age: 35, salary: 70000 },
-];
-
-console.log(Quarr.fromQuery(employees, "SELECT * FROM employees WHERE age > 20"));
-// Output:
-// [
-//   { id: 1, name: 'Alice', age: 25, salary: 50000 },
-//   { id: 2, name: 'Bob', age: 30, salary: 60000 },
-//   { id: 3, name: 'Charlie', age: 35, salary: 70000 }
-// ]
-```
-
----
-
-## 🧩 API Reference
+## ⚙️ API Reference
 
 ### `Quarr.from(data: T[])`
-Creates a new query instance from an array of objects.
+Creates a new query instance.
 
 ### `.select(fields: (keyof T)[])`
 Selects specific fields.
 
 ### `.where(predicate: (item: T) => boolean)`
-Filters the dataset using a custom condition.
+Filters records.
 
-### `.sort(field: keyof T, order: 'asc' | 'desc' = 'asc')`
-Sorts the data by the specified field.
+### `.sort(field: keyof T, order?: 'asc' | 'desc')`
+Sorts data.
 
-### `.join<U, K extends keyof T, V extends keyof U>(other: U[], key1: K, key2: V, selectFields?: (item: T & U) => Partial<T & U>)`
-Performs an optimized join operation using indexed data.
+### `.join<U>(other: U[], key1: keyof T, key2: keyof U, select?: (item: T & U) => Partial<T & U>)`
+Performs a join using indexes.
 
 ### `.sum(field: keyof T)`
-Returns the sum of a numeric field.
+Sum of numeric field.
 
 ### `.avg(field: keyof T)`
-Returns the average of a numeric field.
+Average of numeric field.
+
+### `.min(field: keyof T)`
+Minimum of numeric field.
+
+### `.max(field: keyof T)`
+Maximum of numeric field.
 
 ### `.count()`
-Returns the number of elements in the dataset (supports chaining).
+Number of records.
 
 ### `.execute()`
-Executes the query chain and returns the resulting array.
+Executes and returns result.
 
-### `isValidQuery(query: string)`
-Validates if a query string matches the supported SQL-like syntax.
+### `Quarr.fromQuery<T>(data: T[], query: string)`
+Parses and executes a SQL-like query string.
 
-### `fromQuery<U extends Record<string, any>>(data: U[], query: string)`
-Parses and executes a SQL-like query string on the provided data array.
+---
+
+## ⚠️ Breaking Changes
+
+- `isValidQuery` **has been removed**.
+  Query validation now happens automatically within `fromQuery()`.
 
 ---
 
 ## 🧑‍💻 Contributing
 
-Contributions are welcome! Open an issue or submit a pull request to help improve Quarr.
+Contributions are welcome!  
+Open an issue or PR on GitHub to help improve `quarr`.
 
 ---
 
