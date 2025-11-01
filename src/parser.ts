@@ -320,7 +320,7 @@ export function executeAST(ast: SQLSelectAST, data: any[]): any[] {
   }
 
   // LIMIT
-  if (ast.limit != null) projected = projected.slice(0, ast.limit);
+  if (ast.limit) projected = projected.slice(0, ast.limit);
 
   return projected;
 }
