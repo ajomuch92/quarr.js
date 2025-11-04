@@ -360,3 +360,47 @@ function orderRows(rows: any[], orderBy: { field: string; direction: "ASC" | "DE
   });
   return rowsCopy;
 }
+
+/**
+ * Limpia una cadena SQL-like eliminando CAST, comentarios, y paréntesis redundantes.
+ * Se usa antes de parsear el query.
+ */
+export function cleanQueryString(query: string): string {
+  if (!query) return "";
+
+  return query
+    // 1️⃣ Eliminar comentarios de línea y bloque
+    .replace(/--.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+
+    // 2️⃣ Eliminar CAST(... AS tipo) o CAST(... tipo)
+    .replace(/\bCAST\s*\(\s*([^)]+?)\s*(?:AS\s+)?[A-Z]+\s*(?:\([^)]*\))?\s*\)/gi, "$1")
+
+    // 3️⃣ Eliminar funciones comunes: LOWER, UPPER, TRIM, LTRIM, RTRIM, COALESCE, etc.
+    //    y quedarse solo con su argumento
+    .replace(
+      /\b(LOWER|UPPER|TRIM|LTRIM|RTRIM|COALESCE|ROUND|LEN|SUBSTRING)\s*\(\s*([^)]+?)\s*\)/gi,
+      "$2"
+    )
+
+    // 4️⃣ Quitar paréntesis dobles innecesarios ((columna))
+    .replace(/\(\s*\(([^)]+)\)\s*\)/g, "$1")
+
+    // 5️⃣ Quitar paréntesis únicos alrededor de columnas o expresiones simples
+    //    pero asegurar espacio entre tokens
+    .replace(/\(\s*([^)]+?)\s*\)/g, " $1 ")
+
+    // 6️⃣ Normalizar espacios múltiples
+    .replace(/\s+/g, " ")
+
+    // 7️⃣ Limpiar comas y paréntesis mal espaciados
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s*\(\s*/g, "(")
+    .replace(/\s*\)\s*/g, ")")
+
+    // 8️⃣ Quitar punto y coma final con espacios o saltos
+    .replace(/\s*;\s*$/, "")
+
+    // 9️⃣ Recorte final
+    .trim();
+}

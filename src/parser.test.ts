@@ -1,4 +1,4 @@
-import { evalCondition, executeAST, parseSQL } from "../src/parser";
+import { cleanQueryString, evalCondition, executeAST, parseSQL } from "../src/parser";
 
 const sampleData = [
   { id: 1, name: "Alice", dept: "Cardiology", region: "East", cost: 500 },
@@ -127,5 +127,62 @@ describe("SQL Parser (quarr)", () => {
 
   test('parseSQL debería lanzar error para query inválida', () => {
     expect(() => parseSQL("DELETE FROM data")).toThrow("Invalid query: missing SELECT or FROM");
+  });
+});
+
+describe("cleanQueryString", () => {
+  it("should remove CAST with AS syntax", () => {
+    const input = "SELECT CAST(age AS INT), name FROM users;";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT age, name FROM users");
+  });
+
+  it("should remove CAST without AS keyword", () => {
+    const input = "SELECT CAST(price DECIMAL(10,2)) FROM sales";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT price FROM sales");
+  });
+
+  it("should remove block and line comments", () => {
+    const input = `
+      SELECT id, name /* inline comment */
+      FROM users -- line comment
+    `;
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT id, name FROM users");
+  });
+
+  it("should handle nested parentheses", () => {
+    const input = "SELECT ((amount)) FROM table";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT amount FROM table");
+  });
+
+  it("should normalize excessive spaces", () => {
+    const input = "SELECT   id ,  name   FROM   users";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT id, name FROM users");
+  });
+
+  it("should remove trailing semicolons", () => {
+    const input = "SELECT * FROM employees;";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT * FROM employees");
+  });
+
+  it("should handle mixed CAST and comments", () => {
+    const input = `
+      SELECT CAST( price AS DECIMAL(10,2) ) AS total, -- comment
+      /* block comment */ name
+      FROM sales;
+    `;
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT price AS total, name FROM sales");
+  });
+
+  it("should leave normal functions untouched", () => {
+    const input = "SELECT LOWER(name) FROM users";
+    const output = cleanQueryString(input);
+    expect(output).toBe("SELECT name FROM users");
   });
 });
