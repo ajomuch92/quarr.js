@@ -23,8 +23,7 @@ export interface SQLSelectAST {
    --------------------------- */
 
 export function parseSQL(query: string): SQLSelectAST {
-  const clean = query.replace(/\s+/g, " ").replace(/;$/, "").trim();
-
+  const clean = cleanQueryString(query.replace(/\s+/g, " "));
   const result: SQLSelectAST = { type: "select", fields: [], from: "" };
 
   const selectMatch = clean.match(/^SELECT (.+?) FROM /i);
@@ -361,46 +360,94 @@ function orderRows(rows: any[], orderBy: { field: string; direction: "ASC" | "DE
   return rowsCopy;
 }
 
-/**
- * Limpia una cadena SQL-like eliminando CAST, comentarios, y paréntesis redundantes.
- * Se usa antes de parsear el query.
- */
+function splitSelectFields(selectBody: string): string[] {
+  const res: string[] = [];
+  let cur = "";
+  let depth = 0;
+  for (let i = 0; i < selectBody.length; i++) {
+    const ch = selectBody[i];
+    if (ch === "(") {
+      depth++;
+      cur += ch;
+    } else if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      cur += ch;
+    } else if (ch === "," && depth === 0) {
+      res.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.trim()) res.push(cur.trim());
+  return res;
+}
+
+function cleanSelectField(field: string): string {
+  // Mantener alias: detectar "AS alias" o "expr alias"
+  // vamos a separar por AS primero (case-insensitive)
+  let alias = "";
+  let expr = field;
+  const asMatch = field.match(/\s+AS\s+([A-Za-z0-9_]+)$/i);
+  if (asMatch) {
+    alias = asMatch[1];
+    expr = field.slice(0, asMatch.index).trim();
+  } else {
+    // posible alias sin AS: "expr alias"
+    const parts = field.split(/\s+/);
+    if (parts.length > 1) {
+      // si la última parte no contiene paréntesis ni operador, considerar alias
+      const last = parts[parts.length - 1];
+      if (!/[(),]/.test(last) && !/\w+\(.*\)/.test(last)) {
+        alias = last;
+        expr = parts.slice(0, -1).join(" ");
+      }
+    }
+  }
+
+  // Si la expr es una agregación (COUNT,SUM,AVG,MIN,MAX) la dejamos tal cual (solo normalizamos espacios)
+  if (/^\s*(COUNT|SUM|AVG|MIN|MAX)\s*\(/i.test(expr)) {
+    const out = expr.trim();
+    return alias ? `${out} AS ${alias}` : out;
+  }
+
+  // Limpiar cast y funciones de formato en expr
+  let e = expr
+    .replace(/\bCAST\s*\(\s*([^,)]+?)\s*(?:AS\s+)?[A-Z0-9_]+(?:\s*\([^)]*\))?\s*\)/gi, "$1")
+    .replace(/\b(LOWER|UPPER|TRIM|LTRIM|RTRIM)\s*\(\s*([^)]+?)\s*\)/gi, "$2")
+    .replace(/\bSUBSTRING\s*\(\s*([^)]+?)(?:\s+FROM[\s\S]*?|\s*,[\s\S]*?)\)/gi, "$1");
+
+  // eliminar envolturas simples de identificador ( (col) -> col ), pero SOLO si no hay función
+  e = e.replace(/^\(\s*\(\s*([A-Za-z0-9_.]+)\s*\)\s*\)$/, "$1"); // doble
+  e = e.replace(/^\(\s*([A-Za-z0-9_.]+)\s*\)$/, "$1"); // simple
+
+  // reconstruir con alias si existe
+  return alias ? `${e.trim()} AS ${alias}` : e.trim();
+}
+
 export function cleanQueryString(query: string): string {
   if (!query) return "";
 
-  return query
-    // 1️⃣ Eliminar comentarios de línea y bloque
+  let cleaned = query
     .replace(/--.*$/gm, "")
     .replace(/\/\*[\s\S]*?\*\//g, "")
-
-    // 2️⃣ Eliminar CAST(... AS tipo) o CAST(... tipo)
-    .replace(/\bCAST\s*\(\s*([^)]+?)\s*(?:AS\s+)?[A-Z]+\s*(?:\([^)]*\))?\s*\)/gi, "$1")
-
-    // 3️⃣ Eliminar funciones comunes: LOWER, UPPER, TRIM, LTRIM, RTRIM, COALESCE, etc.
-    //    y quedarse solo con su argumento
-    .replace(
-      /\b(LOWER|UPPER|TRIM|LTRIM|RTRIM|COALESCE|ROUND|LEN|SUBSTRING)\s*\(\s*([^)]+?)\s*\)/gi,
-      "$2"
-    )
-
-    // 4️⃣ Quitar paréntesis dobles innecesarios ((columna))
-    .replace(/\(\s*\(([^)]+)\)\s*\)/g, "$1")
-
-    // 5️⃣ Quitar paréntesis únicos alrededor de columnas o expresiones simples
-    //    pero asegurar espacio entre tokens
-    .replace(/\(\s*([^)]+?)\s*\)/g, " $1 ")
-
-    // 6️⃣ Normalizar espacios múltiples
+    .replace(/\r?\n/g, " ")
     .replace(/\s+/g, " ")
-
-    // 7️⃣ Limpiar comas y paréntesis mal espaciados
-    .replace(/\s*,\s*/g, ", ")
-    .replace(/\s*\(\s*/g, "(")
-    .replace(/\s*\)\s*/g, ")")
-
-    // 8️⃣ Quitar punto y coma final con espacios o saltos
-    .replace(/\s*;\s*$/, "")
-
-    // 9️⃣ Recorte final
     .trim();
+
+  const m = cleaned.match(/^(SELECT\s+)(.+?)(\s+FROM\s+)([\s\S]*)$/i);
+  if (!m) return cleaned.replace(/\s*;\s*$/, "").trim();
+
+  const [, selectStart, selectBody, fromPart, rest] = m;
+
+  const fields = splitSelectFields(selectBody);
+  const cleanedFields = fields.map(cleanSelectField);
+  const newSelect = cleanedFields.join(", ");
+
+  const rebuilt = `${selectStart}${newSelect}${fromPart}${rest || ""}`
+    .replace(/\s+/g, " ")
+    .replace(/\s*;\s*$/, "")
+    .trim();
+
+  return rebuilt;
 }
