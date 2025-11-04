@@ -203,6 +203,7 @@ Parses and executes a SQL-like query string.
 
 - `isValidQuery` **has been removed**.
   Query validation now happens automatically within `fromQuery()`.
+- Adding a method to clean query strings, which removes unsupported functions from SQL-like queries.
 
 ---
 
